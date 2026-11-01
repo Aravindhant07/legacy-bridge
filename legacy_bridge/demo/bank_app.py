@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import signal
 import random
 import select
 import sys
@@ -321,7 +322,10 @@ def read_key(fd: int, timeout: float | None = None) -> str | None:
     r, _, _ = select.select([fd], [], [], timeout)
     if not r:
         return None
-    data = os.read(fd, 1).decode(errors="ignore")
+    raw = os.read(fd, 1)
+    if not raw:
+        raise EOFError  # the terminal went away: exit instead of spinning
+    data = raw.decode(errors="ignore")
     if data == "\x1b":
         # escape sequence: read what is immediately available
         while True:
@@ -341,6 +345,7 @@ def main() -> None:
     p.add_argument("--popup", type=float, default=0.0)
     p.add_argument("--timeout", type=float, default=0.0)
     a = p.parse_args()
+    signal.signal(signal.SIGHUP, lambda *_: sys.exit(0))
     app = App(a.slow, a.drift, a.popup, a.timeout)
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd) if os.isatty(fd) else None
@@ -349,17 +354,23 @@ def main() -> None:
             tty.setraw(fd)
         app.render()
         while True:
-            k = read_key(fd)
+            try:
+                k = read_key(fd)
+            except (EOFError, OSError):
+                break
             if k is None:
                 continue
             if not app.key(k):
                 break
             app.render()
     finally:
-        if old:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old)
-        sys.stdout.write("\x1b[2J\x1b[H")
-        sys.stdout.flush()
+        try:
+            if old:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old)
+            sys.stdout.write("\x1b[2J\x1b[H")
+            sys.stdout.flush()
+        except OSError:
+            pass  # terminal already closed
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ import subprocess
 import termios
 import threading
 import time
+import weakref
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
@@ -79,6 +80,8 @@ class VTDriver:
                                       start_new_session=True, close_fds=True)
         os.close(slave)
         self._fd = master
+        # Safety net: never leave the terminal program running if the driver is dropped or Python exits.
+        weakref.finalize(self, _terminate, self._proc)
         self._reader = threading.Thread(target=self._read_loop, daemon=True)
         self._reader.start()
 
@@ -159,6 +162,15 @@ class VTDriver:
             except OSError:
                 pass
             self._fd = None
+
+
+def _terminate(proc: subprocess.Popen) -> None:
+    if proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            proc.kill()
 
 
 def demo_bank_argv(*flags: str) -> list[str]:
