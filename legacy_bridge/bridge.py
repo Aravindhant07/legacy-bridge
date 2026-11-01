@@ -133,6 +133,8 @@ class Bridge:
     # -- primitives (each verifies the screen first) ---------------------
     def _require(self, screen: str) -> Snapshot:
         sid, snap = self.where()
+        if sid == "SIGNON" and screen != "SIGNON":
+            raise self._fail("session_expired", self._message("SIGNON", snap) or "the session returned to the sign-on screen", snap)
         if sid != screen:
             raise self._fail("wrong_screen", f"expected {screen} but the terminal shows {sid}", snap)
         return snap
@@ -179,6 +181,7 @@ class Bridge:
                 expect = value.upper() if not f.hidden else "*" * len(value)
                 ok = d.wait_for(lambda s: s.text_at(f.row, f.col, f.len).rstrip("_ ").upper() == expect.upper(), timeout=self.timeout)
                 if ok is None:
+                    self._require(screen)  # raises session_expired if the system signed us off
                     raise self._fail("type_failed", f"typed value did not appear in '{name}'", d.snapshot())
             self.audit.write("key.fill", screen=screen, field=name, value="***" if f.hidden else value)
 
@@ -207,6 +210,8 @@ class Bridge:
                 continue
             if sid in screens:
                 return sid, snap
+            if sid == "SIGNON":
+                raise self._fail("session_expired", self._message("SIGNON", snap) or "signed off", snap)
 
     def _message(self, screen: str, snap: Snapshot) -> str:
         row = self.map.screens[screen].message_row
@@ -298,7 +303,13 @@ class Bridge:
             self.audit.write("tool.call", tool=name, args=args, mode=tool.mode)
             if self.pending and name != "confirm_action":
                 self._cancel_pending(f"new tool call: {name}")
-            result = self._run(name, tool, args)
+            try:
+                result = self._run(name, tool, args)
+            except BridgeError as e:
+                if e.kind != "session_expired":
+                    raise
+                self.audit.write("session.recover", tool=name, reason=e.message)
+                result = self._run(name, tool, args)  # nothing was committed: safe to run again
             if tool.confirm:
                 if self.writes == "on":
                     return self._commit(name, tool)

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "legacy-bridge"
+version = "0.1.0"
+description = "Turn legacy terminal (green-screen) applications into safe, typed tools AI agents can call over MCP."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+  "pyte>=0.8",
+  "mcp>=2.0",
+  "pydantic>=2.6",
+  "pyyaml>=6",
+  "typer>=0.12",
+  "anyio>=4",
+]
+
+[project.optional-dependencies]
+local = ["torch>=2.2", "transformers>=4.45", "accelerate>=0.30"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+lbridge = "legacy_bridge.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["legacy_bridge*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
