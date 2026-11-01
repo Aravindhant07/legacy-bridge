@@ -159,6 +159,23 @@ def record(
     typer.echo(f"Recorded {len(rec.steps)} steps → draft tool in {out}. Review it, then add it to your tools file.")
 
 
+@app.command("eval-agent")
+def eval_agent(
+    model: str = typer.Option("Qwen/Qwen2.5-3B-Instruct", "--model", "-m", help="Hugging Face model id, run locally."),
+    out: Path = typer.Option(ROOT / "docs" / "results", "--out", "-o"),
+    only: Optional[str] = typer.Option(None, "--only", help="Comma-separated task ids."),
+) -> None:
+    """Score a local open model on the graded banking tasks, using the tools over MCP."""
+    from .agent import LocalChatModel
+    from .evaluate import evaluate
+
+    def show(task_id, passed, trace):
+        typer.echo(f"  {'PASS' if passed else 'FAIL'}  {task_id:<20} {len(trace.calls)} tool calls · {trace.seconds}s")
+
+    s = evaluate(LocalChatModel(model), out, only.split(",") if only else None, show)
+    typer.echo(f"{s['model']}: {s['passed']}/{s['total']} tasks passed · {s['tool_calls']} tool calls · {s['seconds']}s")
+
+
 @app.command("verify-audit")
 def verify_audit(audit: Path = AuditOpt) -> None:
     """Check the hash-chained audit log for edits or deletions."""
