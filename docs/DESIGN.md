@@ -1,4 +1,4 @@
-# Design: Legacy Bridge (draft for approval)
+# Design: Legacy Bridge
 
 Approved choices: **core banking** demo system · **VT100/ANSI first**, 3270 later through the same
 driver interface · repo **legacy-bridge** · free local open models by default.
