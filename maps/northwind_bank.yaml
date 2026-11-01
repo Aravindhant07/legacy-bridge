@@ -1,0 +1,110 @@
+# Screen map for the Northwind Savings demo core-banking system.
+# Rows and columns are 1-based, as shown on the terminal.
+system: northwind_bank
+screens:
+  SIGNON:
+    identify: [{row: 1, col: 2, text: SIGNON}]
+    fields:
+      user: {row: 6, col: 40, len: 10, input: true}
+      password: {row: 8, col: 40, len: 10, input: true, hidden: true}
+    message_row: 23
+
+  MAIN:
+    identify: [{row: 1, col: 2, text: MAIN}, {row: 2, col: 35, text: MAIN MENU}]
+    fields:
+      selection: {row: 13, col: 40, len: 1, input: true}
+    message_row: 23
+    edges:
+      - {to: ACIN01, fill: {selection: "1"}}
+      - {to: CUSR01, fill: {selection: "2"}}
+      - {to: TXHS01, fill: {selection: "3"}}
+      - {to: FNTR01, fill: {selection: "4"}}
+      - {to: SIGNON, press: F3}
+
+  SYSBRD:
+    identify: [{row: 1, col: 2, text: SYSBRD}]
+    interrupt: true
+    dismiss: ENTER
+
+  ACIN01:
+    identify: [{row: 1, col: 2, text: ACIN01}]
+    fields:
+      account_no: {row: 4, col: 18, len: 10, input: true, pattern: "^\\d{10}$"}
+      holder:      {row: 6,  col: 18, len: 30, label: {col: 2, text: "ACCOUNT HOLDER:"}}
+      customer_id: {row: 7,  col: 18, len: 10, label: {col: 2, text: "CUSTOMER ID   :"}}
+      type:        {row: 8,  col: 18, len: 10, label: {col: 2, text: "ACCOUNT TYPE  :"}}
+      status:      {row: 9,  col: 18, len: 10, label: {col: 2, text: "STATUS        :"}}
+      balance:     {row: 11, col: 18, len: 15, type: money, label: {col: 2, text: "LEDGER BALANCE:"}}
+      available:   {row: 12, col: 18, len: 15, type: money, label: {col: 2, text: "AVAILABLE BAL :"}}
+      holds:       {row: 13, col: 18, len: 15, type: money, label: {col: 2, text: "HOLDS         :"}}
+      last_activity: {row: 15, col: 18, len: 10, type: date, label: {col: 2, text: "LAST ACTIVITY :"}}
+      branch:      {row: 16, col: 18, len: 6, label: {col: 2, text: "BRANCH        :"}}
+    message_row: 23
+    edges: [{to: MAIN, press: F3}]
+
+  CUSR01:
+    identify: [{row: 1, col: 2, text: CUSR01}]
+    fields:
+      last_name: {row: 4, col: 18, len: 20, input: true, pattern: "^[A-Za-z' -]{1,20}$"}
+    tables:
+      results:
+        first_row: 7
+        last_row: 20
+        key_column: customer_id
+        columns:
+          customer_id: {col: 2, len: 10}
+          name: {col: 12, len: 24}
+          branch: {col: 36, len: 8}
+          account_no: {col: 44, len: 12}
+          type: {col: 56, len: 10}
+          status: {col: 66, len: 8}
+    message_row: 23
+    edges: [{to: MAIN, press: F3}]
+
+  TXHS01:
+    identify: [{row: 1, col: 2, text: TXHS01}]
+    fields:
+      account_no: {row: 4, col: 18, len: 10, input: true, pattern: "^\\d{10}$"}
+    tables:
+      transactions:
+        first_row: 7
+        last_row: 18
+        key_column: date
+        next_page: F8
+        end_marker: END OF LIST
+        page_indicator: {row: 20, col: 2, text: PAGE}
+        columns:
+          date: {col: 2, len: 10, type: date}
+          description: {col: 14, len: 28}
+          amount: {col: 42, len: 14, type: money}
+          balance: {col: 56, len: 16, type: money}
+    message_row: 23
+    edges: [{to: MAIN, press: F3}]
+
+  FNTR01:
+    identify: [{row: 1, col: 2, text: FNTR01}]
+    fields:
+      from_account: {row: 5, col: 18, len: 10, input: true, pattern: "^\\d{10}$"}
+      to_account: {row: 7, col: 18, len: 10, input: true, pattern: "^\\d{10}$"}
+      amount: {row: 9, col: 18, len: 12, input: true, pattern: "^\\d{1,7}(\\.\\d{1,2})?$"}
+      memo: {row: 11, col: 18, len: 30, input: true, pattern: "^[A-Za-z0-9 .,'-]{0,30}$"}
+    message_row: 23
+    edges: [{to: MAIN, press: F3}]
+
+  FNTR02:
+    identify: [{row: 1, col: 2, text: FNTR02}]
+    fields:
+      from_account: {row: 5, col: 18, len: 10}
+      to_account: {row: 7, col: 18, len: 10}
+      amount: {row: 9, col: 18, len: 15, type: money}
+      memo: {row: 11, col: 18, len: 30}
+    edges: [{to: FNTR01, press: F12}]
+
+  FNTR03:
+    identify: [{row: 1, col: 2, text: FNTR03}]
+    fields:
+      reference: {row: 6, col: 18, len: 12}
+      amount: {row: 8, col: 18, len: 15, type: money}
+      new_balance: {row: 10, col: 18, len: 15, type: money}
+    message_row: 23
+    edges: [{to: MAIN, press: ENTER}]

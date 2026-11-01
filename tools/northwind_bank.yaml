@@ -1,0 +1,67 @@
+# Tools exposed to AI agents for the Northwind Savings demo system.
+# Each tool is a flow over screens defined in maps/northwind_bank.yaml.
+system: northwind_bank
+tools:
+  get_account:
+    description: Look up one bank account by its 10-digit number. Returns holder, type, status, ledger and available balance, holds, last activity date and branch.
+    mode: read
+    inputs:
+      account_no: {type: string, pattern: "^\\d{10}$", description: 10-digit account number}
+    steps:
+      - goto: ACIN01
+      - fill: {account_no: "{account_no}"}
+      - press: ENTER
+      - expect: [ACIN01]
+      - fail_if_message: {"ACCOUNT NOT FOUND": not_found, "INVALID ACCOUNT": invalid_input}
+      - read: [holder, customer_id, type, status, balance, available, holds, last_activity, branch]
+
+  search_customers:
+    description: Find customers by last name (prefix match). Returns one row per account with customer id, name, branch, account number, type and status.
+    mode: read
+    inputs:
+      last_name: {type: string, pattern: "^[A-Za-z' -]{1,20}$", description: Last name or its beginning}
+    steps:
+      - goto: CUSR01
+      - fill: {last_name: "{last_name}"}
+      - press: ENTER
+      - expect: [CUSR01]
+      - empty_if_message: {"NO CUSTOMERS FOUND": results}
+      - read_table: {table: results}
+      - read_message: note
+
+  get_transactions:
+    description: List recent transactions for an account, newest first (12 per page). Returns date, description, amount (negative = debit) and running balance.
+    mode: read
+    inputs:
+      account_no: {type: string, pattern: "^\\d{10}$", description: 10-digit account number}
+      max_pages: {type: integer, minimum: 1, maximum: 5, default: 1, description: How many pages of 12 to read}
+    steps:
+      - goto: TXHS01
+      - fill: {account_no: "{account_no}"}
+      - press: ENTER
+      - expect: [TXHS01]
+      - fail_if_message: {"ACCOUNT NOT FOUND": not_found, "INVALID ACCOUNT": invalid_input}
+      - read_table: {table: transactions, max_pages: "{max_pages}"}
+
+  transfer_funds:
+    description: Move money between two accounts at this bank. This is a WRITE action. Unless the server runs with writes fully enabled, it returns a preview and a confirmation code; call confirm_action with that code to post the transfer.
+    mode: write
+    inputs:
+      from_account: {type: string, pattern: "^\\d{10}$", description: Account to debit}
+      to_account: {type: string, pattern: "^\\d{10}$", description: Account to credit}
+      amount: {type: string, pattern: "^\\d{1,7}(\\.\\d{1,2})?$", description: "Amount, e.g. 125.50"}
+      memo: {type: string, pattern: "^[A-Za-z0-9 .,'-]{0,30}$", default: "", description: Optional memo}
+    steps:
+      - goto: FNTR01
+      - fill: {from_account: "{from_account}", to_account: "{to_account}", amount: "{amount}", memo: "{memo}"}
+      - press: ENTER
+      - expect: [FNTR02, FNTR01]
+      - fail_if_screen: {FNTR01: rejected}
+      - read: [from_account, to_account, amount, memo]
+    confirm:
+      screen: FNTR02
+      key: F10
+      cancel: F12
+      result: [FNTR03, FNTR01]
+      fail_if_screen: {FNTR01: rejected}
+      read: [reference, amount, new_balance]
