@@ -108,6 +108,57 @@ def demo_app(flags: str = typer.Argument("", help="e.g. '--popup 0.3 --slow 0.5'
     os.execvp(sys.executable, [sys.executable, "-m", "legacy_bridge.demo.bank_app", *shlex.split(flags)])
 
 
+@app.command()
+def record(
+    name: str = typer.Argument(..., help="Name for the new tool, e.g. get_balance."),
+    out: Path = typer.Option(Path("recorded_tool.yaml"), "--out", "-o"),
+    map_path: Path = MapOpt, command: Optional[str] = CmdOpt,
+    description: str = typer.Option("", "--description"),
+) -> None:
+    """Perform a task once in the terminal; get a draft tool definition. Press Ctrl-] to finish."""
+    import os
+    import termios
+    import tty
+
+    from .driver import VTDriver, demo_bank_argv
+    from .recorder import Recorder, keys_from_terminal
+    from .screenmap import ScreenMap
+
+    argv = shlex.split(command) if command else demo_bank_argv()
+    drv = VTDriver(argv, env={"PYTHONPATH": str(ROOT)} if not command else {})
+    drv.start()
+    rec = Recorder(ScreenMap.load(map_path), drv)
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+
+    def show() -> None:
+        snap = drv.settle(quiet=0.1, timeout=3)
+        sys.stdout.write("\x1b[2J\x1b[H" + snap.render().replace("\n", "\r\n")
+                         + f"\r\n\x1b[7m recording '{name}': {len(rec.steps)} steps · Ctrl-] to finish \x1b[0m"
+                         + f"\x1b[{snap.cursor[0]};{snap.cursor[1]}H")
+        sys.stdout.flush()
+
+    try:
+        tty.setraw(fd)
+        show()
+        while True:
+            data = os.read(fd, 1024).decode(errors="ignore")
+            if "\x1d" in data:
+                break
+            for kind, value in keys_from_terminal(data):
+                if kind == "text":
+                    rec.send(value)
+                else:
+                    rec.press(value)
+            show()
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        drv.close()
+        sys.stdout.write("\x1b[2J\x1b[H")
+    out.write_text(rec.to_yaml(name, description))
+    typer.echo(f"Recorded {len(rec.steps)} steps → draft tool in {out}. Review it, then add it to your tools file.")
+
+
 @app.command("verify-audit")
 def verify_audit(audit: Path = AuditOpt) -> None:
     """Check the hash-chained audit log for edits or deletions."""
