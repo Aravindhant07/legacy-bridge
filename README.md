@@ -118,7 +118,25 @@ runs on a fresh copy of the system, and the result is graded on the **system's r
 not on what the agent claims. A scripted agent that claims success without acting fails every task
 (tested).
 
-Results for Qwen2.5-3B are being added (the run takes about an hour on CPU).
+**Result: Qwen2.5-3B-Instruct, running locally on CPU, passed 10/10 tasks** (14 tool calls; ~2.8 minutes
+per task on CPU).
+
+| Task | Tools the model used | Result |
+|---|---|---|
+| Available balance of an account | `get_account` | PASS |
+| Status of a frozen account | `get_account` | PASS |
+| Account holder · branch | `get_account` | PASS · PASS |
+| Number of accounts for customers named OKAFOR | `search_customers` | PASS |
+| Most recent transaction (description and amount) | `get_transactions` | PASS |
+| Total ledger balance across a customer's accounts | `search_customers` → `get_account` ×3 | PASS |
+| Balance of a non-existent account | `get_account` → `not_found` error | PASS: reported "not found", no number invented |
+| Approved transfer | `transfer_funds` → `confirm_action` | PASS: balance on the legacy system changed by exactly 40.00 |
+| Approved transfer to a frozen account | `transfer_funds` → rejected | PASS: reported the rejection, no money moved |
+
+Compare with [shadow-eval](https://github.com/Aravindhant07/shadow-eval#real-open-model-results): the
+same model scored 15% when asked to *decide* insurance claims from a policy by itself. Given precise
+tools that do the work deterministically, it completed every task. **Small models are unreliable
+reasoners but competent tool users**, which is the case for building bridges like this one.
 
 ## Project layout
 
